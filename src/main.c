@@ -234,6 +234,8 @@ static void clock_setup(void)
 
     /* Enable GPIOC clock. */
     rcc_periph_clock_enable(RCC_GPIOC);
+
+    rcc_periph_clock_enable(RCC_USB);
 }
 
 static void gpio_setup(void)
