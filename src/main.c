@@ -1,5 +1,9 @@
 #include <stddef.h>
 
+#include <FreeRTOS.h>
+#include <task.h>
+#include <queue.h>
+
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/usb/usbd.h>
@@ -244,13 +248,32 @@ static void gpio_setup(void)
                   GPIO_CNF_OUTPUT_PUSHPULL, GPIO13);
 }
 
+static void blink_task(void *params)
+{
+    (void)params;
+
+    for (;;) {
+        vTaskDelay(500 / portTICK_RATE_MS);
+        gpio_toggle(GPIOC, GPIO13);
+    }
+}
+
+static void usb_task(void *params)
+{
+    usbd_device *usbd_dev = (usbd_device *)params;
+
+    for (;;) {
+        usbd_poll(usbd_dev);
+        taskYIELD();
+    }
+}
+
 int main(void)
 {
-    int i = 0;
-    usbd_device *usbd_dev;
-
     clock_setup();
     gpio_setup();
+
+    usbd_device *usbd_dev;
 
     usbd_dev = usbd_init(&st_usbfs_v1_usb_driver,
                          &dev,
@@ -259,13 +282,13 @@ int main(void)
                          3, usbd_control_buffer, sizeof(usbd_control_buffer));
     usbd_register_set_config_callback(usbd_dev, cdcacm_set_config);
 
-    while (1) {
-        if (i++ > 200000) {
-            i = 0;
-            gpio_toggle(GPIOC, GPIO13);     /* Toggle LEDs. */
-        }
-        usbd_poll(usbd_dev);
-    }
+    xTaskCreate(usb_task, "Usb", configMINIMAL_STACK_SIZE, usbd_dev,
+                tskIDLE_PRIORITY + 1, NULL);
 
-    return 0;
+    xTaskCreate(blink_task, "Blink", configMINIMAL_STACK_SIZE, NULL,
+                tskIDLE_PRIORITY + 1, NULL);
+
+    vTaskStartScheduler();
+
+    return -1;
 }
