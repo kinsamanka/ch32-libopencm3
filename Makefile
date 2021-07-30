@@ -15,11 +15,14 @@ BIN_DIR     := build
 OBJ_DIR     := $(BIN_DIR)/obj
 INCLUDE_DIR := $(SRC_DIR) ./lib
 
-SRC         := $(wildcard $(SRC_DIR)/*.c)
-OBJ         := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC))
+SRC         := $(notdir $(wildcard $(SRC_DIR)/*.c))
+SRC         += $(notdir $(wildcard $(SRC_DIR)/*.cpp))
+SRC         += $(notdir $(wildcard $(SRC_DIR)/*.cxx))
 
 OPENCM3_DIR := ./lib/libopencm3
 INCLUDE_DIR += $(OPENCM3_DIR)/include
+
+VPATH       := $(SRC_DIR)
 
 ###############################################################################
 
@@ -86,9 +89,14 @@ BIN         := $(BIN_DIR)/$(BINARY).bin
 MAP         := $(BIN_DIR)/$(BINARY).map
 LIST        := $(BIN_DIR)/$(BINARY).list
 
-.PHONY: all clean
+OBJS        := $(SRC:.c=.o)
+OBJS        := $(OBJS:.cpp=.o)
+OBJS        := $(OBJS:.cxx=.o)
+OBJ         := $(patsubst %,$(OBJ_DIR)/%,$(OBJS))
 
-all: elf size
+.PHONY: all clean list size
+
+all: elf list size
 
 elf: $(ELF)
 bin: $(BIN)
@@ -104,13 +112,15 @@ endif
 $(ELF): $(OBJ) $(OPENCM3_DIR)/lib/lib$(LIBNAME).a | $(BIN_DIR)
 	$(Q)$(LD) $(LDFLAGS) $(OBJ) $(LDLIBS) -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+$(OBJ): | $(OBJ_DIR)
+
+$(OBJ_DIR)/%.o: %.c
 	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(OBJ_DIR)/%.o: %.cpp
 	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cxx
+$(OBJ_DIR)/%.o: %.cxx
 	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(BIN_DIR) $(OBJ_DIR):
